@@ -1,0 +1,64 @@
+name: Build Mobile Apps (Android APK)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # Permite rodar manualmente
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Update version
+        run: node scripts/update-version.js
+
+      - name: Create placeholder web directory
+        run: |
+          mkdir -p out
+          echo '<!DOCTYPE html><html><body><p>Loading from Vercel...</p></body></html>' > out/index.html
+          cp capacitor.config.ts out/ || true
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build Android APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: piscineiro-app-android
+          path: android/app/build/outputs/apk/release/*.apk
+          retention-days: 30
+
+  # build-ios:
+  #   iOS build desabilitado - requer Apple Developer Account ($99/ano)
+  #   Para buildar iOS localmente:
+  #   1. npx cap sync ios
+  #   2. npx cap open ios
+  #   3. Build no Xcode com sua conta Apple Developer

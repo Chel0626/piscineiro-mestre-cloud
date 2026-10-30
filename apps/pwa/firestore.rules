@@ -1,0 +1,85 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if the user is authenticated and matches the userId
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Helper function to check if the user owns the parent client document
+    function isClientOwner(clientId) {
+      return request.auth != null && 
+             get(/databases/$(database)/documents/clients/$(clientId)).data.userId == request.auth.uid;
+    }
+
+    // Users collection: Users can only access their own profile
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+      
+      match /clientOrders/{date} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Piscineiro Profiles collection: Users can only access their own profile
+    match /piscineiroProfiles/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Clients collection: Users can only access clients they created (userId field)
+    match /clients/{clientId} {
+      // Allow create if the new document's userId matches the authenticated user
+      allow create: if isOwner(request.resource.data.userId);
+      
+      // Allow read/update if the existing document's userId matches the authenticated user
+      allow read, update: if isOwner(resource.data.userId);
+
+      // Allow delete if the document doesn't exist (idempotent) or if the user owns it
+      allow delete: if resource == null || isOwner(resource.data.userId);
+      
+      // Subcollections (visits, stock, etc.)
+      // Since visits don't have userId, we check the parent client's userId
+      match /visits/{visitId} {
+        allow read, write: if isClientOwner(clientId);
+      }
+      
+      match /stock/{stockId} {
+        allow read, write: if isClientOwner(clientId);
+      }
+
+      match /products/{productId} {
+        allow read, write: if isClientOwner(clientId);
+      }
+    }
+
+    // Product Requests collection
+    match /product_requests/{requestId} {
+      allow create: if isOwner(request.resource.data.userId);
+      allow read, update, delete: if isOwner(resource.data.userId);
+    }
+
+    // Temporary Reschedules
+    match /temporary-reschedules/{rescheduleId} {
+      allow create: if isOwner(request.resource.data.userId);
+      allow read, update, delete: if isOwner(resource.data.userId);
+    }
+
+    // Clientes Avulsos
+    match /clientes-avulsos/{clienteId} {
+      allow create: if isOwner(request.resource.data.userId);
+      allow read, update, delete: if isOwner(resource.data.userId);
+    }
+
+    // Subscriptions
+    match /subscriptions/{userId} {
+      allow read: if isOwner(userId);
+    }
+
+    // Subscription Plans
+    match /subscription_plans/{planId} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

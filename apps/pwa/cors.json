@@ -1,0 +1,15 @@
+[
+  {
+    "origin": [
+      "http://localhost:3000", 
+      "http://127.0.0.1:3000",
+      "https://piscineiro-app.vercel.app" 
+    ],
+    "method": ["GET", "POST", "PUT", "DELETE", "HEAD"],
+    "responseHeader": [
+      "Content-Type",
+      "Access-Control-Allow-Origin"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]
