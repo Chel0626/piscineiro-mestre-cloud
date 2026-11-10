@@ -1,0 +1,27 @@
+# Dependencias e builds (reconstruidos dentro da imagem)
+**/node_modules
+**/.next
+**/out
+**/build
+**/dist
+
+# Git e metadados
+.git
+.gitignore
+**/.github
+
+# Ambiente e segredos (nunca entram na imagem)
+**/.env
+**/.env.*
+
+# Editores / OS
+**/.vscode
+**/.DS_Store
+
+# Artefatos locais
+**/*.log
+**/.turbo
+**/coverage
+Dockerfile
+.dockerignore
+README.md
