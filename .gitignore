@@ -53,3 +53,6 @@ next-env.d.ts
 # supabase local temp
 supabase/.temp/
 supabase/.branches/
+
+# Artefatos de agentes/workflows (planos, reviews)
+.agents/

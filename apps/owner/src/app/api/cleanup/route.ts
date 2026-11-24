@@ -41,7 +41,9 @@ export async function POST(request: Request) {
                     const arquivosDaSubpasta = await buscarArquivosVelhos(bucket, itemPath);
                     arquivosAntigos = [...arquivosAntigos, ...arquivosDaSubpasta];
                 } else {
-                    if (new Date(item.created_at) < quinzeDiasAtras) {
+                    // created_at pode vir nulo; sem data nao avaliamos a idade
+                    // (operacao destrutiva: na duvida, nao deleta).
+                    if (item.created_at && new Date(item.created_at) < quinzeDiasAtras) {
                         arquivosAntigos.push(itemPath);
                     }
                 }

@@ -14,12 +14,19 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copia apenas os manifests para maximizar o cache de camadas.
-# O npm ci no monorepo precisa do lockfile da raiz + dos package.json dos workspaces.
+# O npm ci no monorepo precisa do lockfile da raiz + de TODOS os package.json
+# dos workspaces declarados no lockfile; se faltar algum, o npm ci fica
+# inconsistente e as devDependencies (ex.: @types/node) nao ficam disponiveis,
+# fazendo o next build tentar baixa-las em tempo de build.
 COPY package.json package-lock.json ./
 COPY apps/owner/package.json ./apps/owner/package.json
+COPY apps/pwa/package.json ./apps/pwa/package.json
+COPY apps/super-admin/package.json ./apps/super-admin/package.json
 COPY packages/shared/package.json ./packages/shared/package.json
 
-RUN npm ci --no-audit --no-fund
+# --ignore-scripts evita o postinstall do pwa (cd functions && npm install),
+# cujo diretorio ainda nao foi copiado neste stage; nao e necessario para o build do owner.
+RUN npm ci --no-audit --no-fund --ignore-scripts
 
 # -----------------------------------------------------------------------------
 # Stage 2 - builder: compila o app owner e gera o standalone
