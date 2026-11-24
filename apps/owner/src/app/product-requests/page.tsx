@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toPng } from 'html-to-image';
 import { supabase } from '@/lib/supabase';
+import { SaleReceipt, type SaleReceiptItem } from '@/components/SaleReceipt';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +20,8 @@ import {
   Calendar,
   ShoppingCart,
   MapPin,
-  Calculator
+  Calculator,
+  FileText
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { toast } from 'sonner';
@@ -238,6 +241,90 @@ export default function ProductRequestsPage() {
         return acc + (price * qty);
     }, 0);
 
+    const [receiptData, setReceiptData] = useState<{
+      client: { name: string; address?: string; phone?: string };
+      items: SaleReceiptItem[];
+      subtotal: number;
+      total: number;
+    } | null>(null);
+    const [generating, setGenerating] = useState(false);
+    const receiptRef = useRef<HTMLDivElement>(null);
+
+    const handleGenerateNota = () => {
+      const items: SaleReceiptItem[] = (request.products || []).map((product: any) => {
+        const name = typeof product === 'object' ? product.name : product;
+        const qty = typeof product === 'object' ? (product.quantity || 1) : 1;
+        const unitPrice = getItemPrice(product);
+        return {
+          name,
+          un: 'UN',
+          qty,
+          unitPrice,
+          total: unitPrice * qty,
+        };
+      });
+
+      const total = items.reduce((acc, item) => acc + item.total, 0);
+
+      setReceiptData({
+        client: {
+          name: request.client_name || request.clients?.name || 'Cliente',
+          address: request.clients?.address,
+          phone: request.clients?.phone || request.client_phone,
+        },
+        items,
+        subtotal: total,
+        total,
+      });
+      setGenerating(true);
+    };
+
+    useEffect(() => {
+      if (!receiptData) return;
+
+      let cancelled = false;
+
+      const generate = async () => {
+        try {
+          // Aguarda o componente off-screen montar antes de capturar
+          await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+          if (cancelled || !receiptRef.current) return;
+
+          const dataUrl = await toPng(receiptRef.current, {
+            pixelRatio: 2,
+            backgroundColor: '#ffffff',
+          });
+
+          const sanitizedName = (receiptData.client.name || 'cliente')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '') || 'cliente';
+          const dateStr = new Date().toISOString().slice(0, 10);
+
+          const link = document.createElement('a');
+          link.href = dataUrl;
+          link.download = `nota-${sanitizedName}-${dateStr}.png`;
+          link.click();
+        } catch (error) {
+          console.error('Erro ao gerar nota:', error);
+          toast.error('Erro ao gerar nota');
+        } finally {
+          if (!cancelled) {
+            setReceiptData(null);
+            setGenerating(false);
+          }
+        }
+      };
+
+      generate();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [receiptData]);
+
     return (
       <Card className={`border-l-4 ${
         request.status === 'pending' ? 'border-l-yellow-500' : 
@@ -388,6 +475,15 @@ export default function ProductRequestsPage() {
                   {request.provided_by === 'empresa' ? '🏢 Empresa Providencia' : '🏠 Cliente Providencia'}
                 </span>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                disabled={generating}
+                onClick={handleGenerateNota}
+              >
+                <FileText className="mr-1 h-3 w-3" /> {generating ? 'Gerando...' : 'Gerar nota'}
+              </Button>
               <Button 
                 size="sm" 
                 className="w-full bg-green-600 hover:bg-green-700"
@@ -395,6 +491,20 @@ export default function ProductRequestsPage() {
               >
                 <CheckCircle2 className="mr-1 h-3 w-3" /> Concluir Entrega
               </Button>
+              {receiptData && (
+                <div
+                  style={{ position: 'fixed', left: -9999, top: 0, pointerEvents: 'none' }}
+                  aria-hidden
+                >
+                  <SaleReceipt
+                    ref={receiptRef}
+                    client={receiptData.client}
+                    items={receiptData.items}
+                    subtotal={receiptData.subtotal}
+                    total={receiptData.total}
+                  />
+                </div>
+              )}
             </>
           )}
           {(request.status === 'rejected' || (request as any).status === 'completed') && (
